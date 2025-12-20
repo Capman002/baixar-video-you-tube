@@ -16,12 +16,12 @@ Este projeto permite baixar vídeos do YouTube de forma simples e rápida, com i
 - ✅ Conversão automática para MP4 com áudio AAC
 - ✅ Barra de progresso em tempo real
 - ✅ Interface responsiva e minimalista
-- ✅ Bypass automático de proteções anti-bot (via POT Provider)
-- ✅ Pronto para deploy em Docker/Railway
+- ✅ Bypass automático de proteções anti-bot
+- ✅ Pronto para deploy em Docker
 
 ## 🏗️ Arquitetura
 
-```
+```text
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Interface     │───▶│   Backend        │───▶│  POT Provider   │
 │   (Browser)     │    │  (FastAPI)       │    │  (Docker)       │
@@ -51,33 +51,23 @@ Este projeto permite baixar vídeos do YouTube de forma simples e rápida, com i
 
 ### Desenvolvimento Local
 
-1. Clone o repositório:
-
 ```bash
-git clone https://github.com/seu-usuario/baixar-video.git
+# Clone o repositório
+git clone <url-do-repositorio>
 cd baixar-video
-```
 
-2. Inicie o servidor POT Provider:
-
-```bash
+# Inicie o servidor POT Provider
 docker run -d -p 4416:4416 --name pot-provider brainicism/bgutil-ytdlp-pot-provider
-```
 
-3. Instale as dependências:
-
-```bash
+# Instale as dependências
 pip install uv
 uv sync
-```
 
-4. Inicie o servidor:
-
-```bash
+# Inicie o servidor
 uv run uvicorn src.main:socket_app --reload
-```
 
-5. Acesse: http://localhost:8000
+# Acesse: http://localhost:8000
+```
 
 ### Produção (Docker Compose)
 
@@ -87,27 +77,9 @@ docker compose up -d
 
 Isso inicia automaticamente o POT Provider e o Backend.
 
-## ☁️ Deploy
-
-### Railway
-
-1. Faça push do repositório para o GitHub
-2. Crie um novo projeto no Railway
-3. Adicione dois serviços:
-   - **pot-provider:** Imagem Docker `brainicism/bgutil-ytdlp-pot-provider`
-   - **backend:** Deploy do repositório (Dockerfile detectado automaticamente)
-4. Configure a variável de ambiente no backend:
-   ```
-   POT_PROVIDER_URL=http://pot-provider:4416
-   ```
-
-### Outras Plataformas
-
-O projeto inclui `Dockerfile` e `docker-compose.yml` prontos para qualquer plataforma que suporte containers.
-
 ## 📁 Estrutura do Projeto
 
-```
+```text
 baixar-video/
 ├── src/
 │   ├── main.py           # Aplicação FastAPI
