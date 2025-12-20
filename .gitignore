@@ -1,0 +1,31 @@
+# Dependências
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Downloads temporários
+downloads/
+
+# Configurações locais
+cookies.txt
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Binários locais (não necessários no repo)
+ffmpeg.exe
+ffplay.exe
+ffprobe.exe
+
+# UV
+uv.lock
+
+# Logs
+*.log

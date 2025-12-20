@@ -1,0 +1,32 @@
+services:
+  # POT Token Generator Server
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider
+    container_name: pot-provider
+    restart: unless-stopped
+    ports:
+      - "4416:4416"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4416/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Main Application Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-downloader
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - POT_PROVIDER_URL=http://pot-provider:4416
+    depends_on:
+      pot-provider:
+        condition: service_started
+    volumes:
+      - ./downloads:/app/downloads
+      - ./cookies.txt:/app/cookies.txt:ro
