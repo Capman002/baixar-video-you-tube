@@ -1,5 +1,4 @@
 from fastapi import FastAPI, BackgroundTasks, Request
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,11 +18,8 @@ app.add_middleware(
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 socket_app = socketio.ASGIApp(sio, app)
 
-# --- Static & Templates ---
-# Create static structure if not exists (User complained about pollution, we keep it minimal inside src/)
-# In UV structure, static usually goes in package or separate. We mapped src/static.
+# --- Templates ---
 templates = Jinja2Templates(directory=str(settings.BASE_DIR / "src" / "templates"))
-app.mount("/static", StaticFiles(directory=str(settings.BASE_DIR / "src" / "static")), name="static")
 
 
 # --- Routes ---
