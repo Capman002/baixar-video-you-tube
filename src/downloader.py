@@ -1,168 +1,354 @@
+"""
+Serviço de Download refatorado.
+Suporta múltiplos formatos, qualidades, playlists e sistema de fila.
+"""
 import yt_dlp
 import asyncio
-import uuid
 import os
-from typing import Optional, Dict, Any
-from pathlib import Path
-from src.settings import settings
 import logging
+from typing import Optional, Dict, Any, List
+from pathlib import Path
+from datetime import datetime
+
+from src.settings import settings
+from src.models import (
+    DownloadFormat,
+    VideoQuality,
+    AudioQuality,
+    DownloadStatus,
+    get_format_string,
+    detect_platform
+)
+from src.queue_manager import QueuedDownload, queue_manager
+from src.database import (
+    get_db_session,
+    create_download_record,
+    update_download_status
+)
 
 logger = logging.getLogger("uvicorn")
 
+
 class DownloadService:
+    """
+    Serviço de download com suporte a:
+    - Múltiplos formatos (vídeo MP4, áudio MP3)
+    - Múltiplas qualidades
+    - Playlists
+    - Progress em tempo real via SocketIO
+    - Persistência no banco de dados
+    """
+    
     def __init__(self, sio):
         self.sio = sio
-
+    
     async def _emit(self, event: str, data: Dict[str, Any], sid: str):
-        # SocketIO emit is async-friendly in python-socketio
-        await self.sio.emit(event, data, room=sid)
-
+        """Emite evento via SocketIO."""
+        if sid:
+            await self.sio.emit(event, data, room=sid)
+    
     def _get_cookies_path(self) -> Optional[str]:
+        """Retorna path dos cookies se disponível."""
         if settings.COOKIES_FILE.exists() and settings.COOKIES_FILE.stat().st_size > 200:
             return str(settings.COOKIES_FILE)
         return None
-
-    def _progress_hook_factory(self, sid: str):
-        # We need a closure to capture sid, but the hook is sync
-        # We can't await inside the hook directly unless we use an event loop helper
-        # Usually python-socketio background tasks handle this, or we use call_soon_threadsafe
-        # For simplicity in thread, we can use a sync emit if supported or run_coroutine_threadsafe
+    
+    def _build_ydl_opts(
+        self,
+        output_template: str,
+        format_type: DownloadFormat,
+        video_quality: VideoQuality,
+        audio_quality: AudioQuality,
+        playlist_items: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        """Constrói as opções do yt-dlp."""
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        format_string = get_format_string(format_type, video_quality, audio_quality)
         
-        def hook(d):
-            if d['status'] == 'downloading':
-                try:
+        opts = {
+            'format': format_string,
+            'outtmpl': output_template,
+            'noplaylist': False,  # Permite playlists
+            'quiet': True,
+            'no_warnings': True,
+            'nocheckcertificate': True,
+            'logger': logger,
+            'ignoreerrors': True,  # Continua em erros de itens individuais
+        }
+        
+        # Merge para MP4
+        if format_type == DownloadFormat.VIDEO:
+            opts['merge_output_format'] = 'mp4'
+            opts['postprocessor_args'] = {
+                'merger': ['-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k']
+            }
+        
+        # Extração de áudio
+        if format_type == DownloadFormat.AUDIO:
+            opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': audio_quality.value,
+            }]
+        
+        # Seleção de itens da playlist
+        if playlist_items:
+            opts['playlist_items'] = ','.join(str(i) for i in playlist_items)
+        
+        # Cookies
+        cookies_path = self._get_cookies_path()
+        if cookies_path:
+            opts['cookiefile'] = cookies_path
+            logger.info("Usando cookies de autenticação")
+        
+        # POT Provider
+        if settings.POT_PROVIDER_URL:
+            opts['extractor_args'] = {
+                'youtubepot-bgutilhttp': {
+                    'base_url': settings.POT_PROVIDER_URL
+                }
+            }
+            logger.info(f"POT Provider: {settings.POT_PROVIDER_URL}")
+        
+        return opts
+    
+    async def process_download(self, item: QueuedDownload):
+        """
+        Processa um download da fila.
+        Este método é chamado pelo QueueManager.
+        """
+        job_id = item.job_id
+        sid = item.sid
+        
+        # Parse enums
+        format_type = DownloadFormat(item.format)
+        video_quality = VideoQuality(item.video_quality)
+        audio_quality = AudioQuality(item.audio_quality)
+        
+        # Template de saída
+        ext = "mp3" if format_type == DownloadFormat.AUDIO else "mp4"
+        output_template = str(settings.DOWNLOAD_DIR / f"{job_id}_%(playlist_index)s.%(ext)s")
+        
+        # Cria registro no banco
+        async with get_db_session() as session:
+            await create_download_record(
+                session=session,
+                job_id=job_id,
+                url=item.url,
+                platform=item.platform,
+                format=item.format,
+                quality=item.video_quality,
+                title=item.title
+            )
+        
+        # Notifica início
+        await self._emit('download_status', {
+            'job_id': job_id,
+            'status': 'fetching_info',
+            'message': 'Obtendo informações...'
+        }, sid)
+        
+        # Opções do yt-dlp
+        ydl_opts = self._build_ydl_opts(
+            output_template=output_template,
+            format_type=format_type,
+            video_quality=video_quality,
+            audio_quality=audio_quality,
+            playlist_items=item.playlist_items
+        )
+        
+        loop = asyncio.get_running_loop()
+        
+        def run_download():
+            """Executa o download em thread separada."""
+            downloaded_files = []
+            total_items = 1
+            current_item = 0
+            
+            def progress_hook(d):
+                nonlocal current_item
+                
+                if d['status'] == 'downloading':
                     total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                     downloaded = d.get('downloaded_bytes', 0)
                     percentage = (downloaded / total * 100) if total else 0
+                    speed = d.get('speed') or 0
+                    eta = d.get('eta')
                     
-                    # Hack: running async emit from sync thread
-                    # Simplification: In production, use redis queue for status updates
-                    # Here we just print log or try to bridge
-                    # Actually, python-socketio 'emit' is often thread-safe if using 'server.emit'
-                    # But since we passed 'sio' which is AsyncServer, we need loop.
-                    pass # Handled by outer thread wrapper if possible, or just skip granular progress for now to keep code clean?
-                    # NO, user wants progress.
+                    payload = {
+                        'job_id': job_id,
+                        'status': 'downloading',
+                        'percentage': round(percentage, 1),
+                        'speed': f"{speed/1024/1024:.1f} MB/s" if speed else "...",
+                        'eta': f"{eta}s" if eta else None,
+                        'current_item': current_item + 1,
+                        'total_items': total_items
+                    }
                     
-                    # Valid Modern Python Approach:
-                    # Capture data, put in Queue, Consume Queue in Main Async Loop.
-                    # Too complex for this snippet?
-                    # Let's use the 'external' sync emit method if available or just ignore strict async purity for the hook.
+                    # Atualiza fila
+                    queue_manager.update_progress(job_id, percentage, DownloadStatus.DOWNLOADING)
                     
-                    # Simpler: The hook runs in the thread. 
-                    # We can use `asyncio.run_coroutine_threadsafe` against the MAIN loop.
-                    pass
-                except Exception:
-                    pass
-
-        return hook
-
-    async def download_video(self, url: str, sid: str):
-        job_id = str(uuid.uuid4())
-        output_tmpl = settings.DOWNLOAD_DIR / f"{job_id}.%(ext)s"
-        
-        cookies_path = self._get_cookies_path()
-        
-        # Modern: Define options clearly
-        ydl_opts = {
-            # Prefer MP4/M4A native formats, fallback to any and convert
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-            'outtmpl': str(output_tmpl),
-            'noplaylist': True,
-            'quiet': True,
-            'nocheckcertificate': True,
-            'logger': logger,
-            # Force audio re-encoding to AAC during merge (fixes Opus/WebM audio issues)
-            'postprocessor_args': {
-                'merger': ['-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k']
-            },
-        }
-
-        # Professional Auth handling
-        if cookies_path:
-            ydl_opts['cookiefile'] = cookies_path
-            logger.info("Using auth cookies.")
-        
-        # POT Provider Integration
-        # The bgutil-ytdlp-pot-provider plugin auto-detects the POT server at localhost:4416
-        # For custom POT server URL, we can use extractor_args
-        pot_url = os.environ.get('POT_PROVIDER_URL')
-        if pot_url:
-            logger.info(f"POT Provider configured: {pot_url}")
-            ydl_opts['extractor_args'] = {
-                'youtubepot-bgutilhttp': {
-                    'base_url': pot_url
-                }
-            }
-        else:
-            # Local development: Plugin will auto-detect localhost:4416
-            logger.info("Using default POT Provider (localhost:4416 if available)")
-
-
-        loop = asyncio.get_running_loop()
-
-        def run_thread():
-            # Sync wrapper for YT-DLP
-            # We enforce MP4
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # We can inject a custom progress hook here that calls loop.call_soon_threadsafe
-                def progress(d):
-                    if d['status'] == 'downloading':
-                        total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
-                        down = d.get('downloaded_bytes', 0)
-                        pct = (down / total * 100) if total else 0
-                        speed = d.get('speed') or 0
-                        
-                        payload = {
-                            "percentage": round(pct, 2),
-                            "speed": f"{speed/1024/1024:.1f} MB/s",
-                            "status": "downloading"
-                        }
-                        
-                        future = asyncio.run_coroutine_threadsafe(
-                            self.sio.emit('download_progress', payload, room=sid), 
-                            loop
-                        )
+                    # Emite via thread-safe
+                    asyncio.run_coroutine_threadsafe(
+                        self._emit('download_progress', payload, sid),
+                        loop
+                    )
                 
-                ydl_opts['progress_hooks'] = [progress]
-                # Re-init with hooks
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl_with_hooks:
-                    info = ydl_with_hooks.extract_info(url, download=True)
-                    return info
-
+                elif d['status'] == 'finished':
+                    filename = d.get('filename')
+                    if filename:
+                        downloaded_files.append(filename)
+                    current_item += 1
+            
+            # Adiciona hook
+            ydl_opts['progress_hooks'] = [progress_hook]
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Primeiro extrai info para saber quantidade
+                info = ydl.extract_info(item.url, download=False)
+                
+                if info.get('_type') == 'playlist':
+                    entries = info.get('entries', [])
+                    total_items = len([e for e in entries if e])
+                    title = info.get('title', 'Playlist')
+                else:
+                    title = info.get('title', 'video')
+                
+                # Atualiza título na fila
+                queue_manager.update_title(job_id, title)
+                
+                # Faz o download
+                ydl.download([item.url])
+            
+            return {
+                'title': title,
+                'files': downloaded_files,
+                'total_items': total_items
+            }
+        
         try:
-            # Run blocking code in thread pool
-            info = await loop.run_in_executor(None, run_thread)
+            # Executa download em thread pool
+            result = await loop.run_in_executor(None, run_download)
             
-            # Post-processing
-            title = info.get('title', 'video')
-            ext = 'mp4' # Forced above
+            # Processa arquivos baixados
+            files = list(settings.DOWNLOAD_DIR.glob(f"{job_id}_*"))
             
-            # Locate file (since yt-dlp might merge keys)
-            # We look for the file starting with job_id
-            possible_files = list(settings.DOWNLOAD_DIR.glob(f"{job_id}*"))
-            if not possible_files:
-                raise FileNotFoundError("Processing failed to create file.")
+            if not files:
+                raise FileNotFoundError("Nenhum arquivo foi baixado")
             
-            actual_file = possible_files[0]
-            # Rename to safe title
-            # Pydantic/Strict approach:
-            safe_title = "".join([c for c in title if c.isalnum() or c in (' ','-','_')]).strip()
-            final_path = settings.DOWNLOAD_DIR / f"{safe_title}.{actual_file.suffix}"
+            # Se for um único arquivo, renomeia
+            if len(files) == 1:
+                original = files[0]
+                safe_title = "".join(
+                    c for c in result['title'] 
+                    if c.isalnum() or c in (' ', '-', '_')
+                ).strip()[:100]
+                
+                final_name = f"{safe_title}{original.suffix}"
+                final_path = settings.DOWNLOAD_DIR / final_name
+                
+                # Remove se existir
+                if final_path.exists():
+                    final_path.unlink()
+                
+                original.rename(final_path)
+                
+                # Atualiza banco
+                async with get_db_session() as session:
+                    await update_download_status(
+                        session=session,
+                        job_id=job_id,
+                        status=DownloadStatus.COMPLETED,
+                        progress=100,
+                        file_path=str(final_path),
+                        file_size=final_path.stat().st_size,
+                        title=result['title']
+                    )
+                
+                # Notifica conclusão
+                queue_manager.mark_completed(job_id)
+                
+                await self._emit('download_complete', {
+                    'job_id': job_id,
+                    'url': f"/api/files/{final_path.name}",
+                    'filename': final_path.name,
+                    'file_size': final_path.stat().st_size
+                }, sid)
             
-            if final_path.exists():
-                final_path.unlink()
+            else:
+                # Múltiplos arquivos (playlist)
+                # Cria um ZIP ou notifica individualmente
+                file_list = []
+                
+                for f in files:
+                    file_list.append({
+                        'url': f"/api/files/{f.name}",
+                        'filename': f.name
+                    })
+                
+                async with get_db_session() as session:
+                    await update_download_status(
+                        session=session,
+                        job_id=job_id,
+                        status=DownloadStatus.COMPLETED,
+                        progress=100,
+                        title=result['title']
+                    )
+                
+                queue_manager.mark_completed(job_id)
+                
+                await self._emit('download_complete', {
+                    'job_id': job_id,
+                    'is_playlist': True,
+                    'files': file_list,
+                    'total': len(file_list)
+                }, sid)
             
-            actual_file.rename(final_path)
+            logger.info(f"Download completo: {job_id}")
             
-            await self.sio.emit('download_complete', {
-                "url": f"/api/files/{final_path.name}",
-                "filename": final_path.name
-            }, room=sid)
-
         except Exception as e:
-            logger.error(f"Download invalid: {e}")
-            await self.sio.emit('download_error', {"error": str(e)}, room=sid)
+            logger.error(f"Erro no download {job_id}: {e}")
+            
+            queue_manager.mark_failed(job_id)
+            
+            async with get_db_session() as session:
+                await update_download_status(
+                    session=session,
+                    job_id=job_id,
+                    status=DownloadStatus.FAILED,
+                    error_message=str(e)
+                )
+            
+            await self._emit('download_error', {
+                'job_id': job_id,
+                'error': str(e)
+            }, sid)
+
+
+# ============================================================
+# LEGACY SUPPORT - Mantém compatibilidade com código antigo
+# ============================================================
+
+class LegacyDownloadService:
+    """Wrapper para manter compatibilidade com a versão antiga."""
+    
+    def __init__(self, sio):
+        self.sio = sio
+        self.service = DownloadService(sio)
+    
+    async def download_video(self, url: str, sid: str):
+        """Método legado - cria um download com opções padrão."""
+        from src.models import DownloadRequest
+        
+        request = DownloadRequest(
+            url=url,
+            format=DownloadFormat.VIDEO,
+            video_quality=VideoQuality.BEST,
+            audio_quality=AudioQuality.Q_192K
+        )
+        
+        # Adiciona à fila
+        item = await queue_manager.add(request, sid=sid)
+        
+        # A fila processará automaticamente
+        return item.job_id
