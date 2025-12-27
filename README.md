@@ -1,72 +1,116 @@
+<div align="center">
+
 # Baixar Vídeo
 
-Ferramenta de código aberto para download de vídeos do YouTube em alta qualidade.
+### Ferramenta profissional para download de vídeos
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green?logo=fastapi&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+<br/>
 
-## 📋 Sobre
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![yt-dlp](https://img.shields.io/badge/yt--dlp-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://github.com/yt-dlp/yt-dlp)
+[![License](https://img.shields.io/badge/License-MIT-F7DF1E?style=for-the-badge)](LICENSE)
 
-Este projeto permite baixar vídeos do YouTube de forma simples e rápida, com interface web moderna e suporte a download em tempo real via WebSocket.
+<br/>
 
-### Funcionalidades
+**Plataformas Suportadas**
 
-- ✅ Download de vídeos em alta qualidade (até 4K)
-- ✅ Conversão automática para MP4 com áudio AAC
-- ✅ Barra de progresso em tempo real
-- ✅ Interface responsiva e minimalista
-- ✅ Bypass automático de proteções anti-bot
-- ✅ Pronto para deploy em Docker
+[![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://youtube.com)
+[![Instagram](https://img.shields.io/badge/Instagram-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://instagram.com)
+[![TikTok](https://img.shields.io/badge/TikTok-000000?style=flat-square&logo=tiktok&logoColor=white)](https://tiktok.com)
+[![X](https://img.shields.io/badge/X-000000?style=flat-square&logo=x&logoColor=white)](https://x.com)
+[![Facebook](https://img.shields.io/badge/Facebook-1877F2?style=flat-square&logo=facebook&logoColor=white)](https://facebook.com)
+[![Vimeo](https://img.shields.io/badge/Vimeo-1AB7EA?style=flat-square&logo=vimeo&logoColor=white)](https://vimeo.com)
+[![Twitch](https://img.shields.io/badge/Twitch-9146FF?style=flat-square&logo=twitch&logoColor=white)](https://twitch.tv)
+[![Reddit](https://img.shields.io/badge/Reddit-FF4500?style=flat-square&logo=reddit&logoColor=white)](https://reddit.com)
 
-## 🏗️ Arquitetura
+</div>
 
-```text
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Interface     │───▶│   Backend        │───▶│  POT Provider   │
-│   (Browser)     │    │  (FastAPI)       │    │  (Docker)       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+---
+
+## Visão Geral
+
+Aplicação web de código aberto para download de vídeos de diversas plataformas. Interface moderna com suporte a múltiplos formatos, qualidades e playlists.
+
+### Funcionalidades Principais
+
+| Recurso                  | Descrição                                            |
+| ------------------------ | ---------------------------------------------------- |
+| **Multi-formato**        | Download em MP4 (vídeo) ou MP3 (áudio)               |
+| **Seleção de qualidade** | 360p, 480p, 720p, 1080p, 1440p, 4K                   |
+| **Suporte a playlists**  | Download de playlists com seleção individual         |
+| **Preview**              | Visualização de informações antes do download        |
+| **Fila de downloads**    | Processamento sequencial com progresso em tempo real |
+| **Histórico**            | Registro persistente de downloads realizados         |
+| **Multi-plataforma**     | Suporte a 1000+ sites via yt-dlp                     |
+
+---
+
+## Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLIENTE                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    Interface Web                           │  │
+│  │              HTML + Tailwind + Socket.IO                   │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
                               │
+                              │ WebSocket / HTTP
                               ▼
-                       ┌──────────────────┐
-                       │   yt-dlp + FFmpeg │
-                       └──────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                         SERVIDOR                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
+│  │   FastAPI   │  │  Socket.IO  │  │      SQLite (async)     │  │
+│  │   (REST)    │  │  (Realtime) │  │       Histórico         │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                              │                                   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                    Download Engine                         │  │
+│  │         yt-dlp + FFmpeg + POT Provider (anti-bot)          │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Stack Tecnológica:**
+### Stack Tecnológica
 
-- **Backend:** FastAPI + Uvicorn (Python 3.11+)
-- **Gerenciador:** UV (gerenciador de pacotes moderno)
-- **Engine:** yt-dlp + FFmpeg
-- **Anti-Bot:** bgutil-ytdlp-pot-provider
-- **Real-time:** Socket.IO
+| Camada          | Tecnologia                      |
+| --------------- | ------------------------------- |
+| Runtime         | Python 3.11+                    |
+| Framework       | FastAPI + Uvicorn               |
+| Realtime        | python-socketio                 |
+| Database        | SQLite + aiosqlite + SQLAlchemy |
+| Download        | yt-dlp + FFmpeg                 |
+| Auth            | bgutil-ytdlp-pot-provider       |
+| Package Manager | UV                              |
 
-## 🚀 Instalação
+---
 
-### Pré-requisitos
+## Instalação
+
+### Requisitos
 
 - Python 3.11 ou superior
-- Docker (para o POT Provider)
-- FFmpeg (incluído no Docker, ou instale localmente)
+- FFmpeg instalado e no PATH
+- Docker (opcional, para POT Provider)
 
 ### Desenvolvimento Local
 
 ```bash
-# Clone o repositório
+# Clonar repositório
 git clone <url-do-repositorio>
 cd baixar-video
 
-# Inicie o servidor POT Provider
+# (Opcional) Iniciar POT Provider para bypass de proteções
 docker run -d -p 4416:4416 --name pot-provider brainicism/bgutil-ytdlp-pot-provider
 
-# Instale as dependências
+# Instalar dependências
 pip install uv
 uv sync
 
-# Inicie o servidor
-uv run uvicorn src.main:socket_app --reload
-
-# Acesse: http://localhost:8000
+# Iniciar servidor
+uv run uvicorn src.main:socket_app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Produção (Docker Compose)
@@ -75,48 +119,100 @@ uv run uvicorn src.main:socket_app --reload
 docker compose up -d
 ```
 
-Isso inicia automaticamente o POT Provider e o Backend.
+---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
-```text
+```
 baixar-video/
 ├── src/
-│   ├── main.py           # Aplicação FastAPI
-│   ├── downloader.py     # Serviço de download
-│   ├── settings.py       # Configurações
+│   ├── main.py             # Aplicação FastAPI + rotas + eventos Socket.IO
+│   ├── downloader.py       # Serviço de download (yt-dlp wrapper)
+│   ├── preview.py          # Serviço de preview (extract_info)
+│   ├── queue_manager.py    # Gerenciador de fila de downloads
+│   ├── database.py         # Conexão SQLite + CRUD
+│   ├── models.py           # Schemas Pydantic + modelos SQLAlchemy
+│   ├── settings.py         # Configurações centralizadas
 │   └── templates/
-│       └── index.html    # Interface web
-├── downloads/            # Pasta temporária de downloads
-├── pyproject.toml        # Dependências (UV/PEP 621)
-├── Dockerfile            # Build de produção
-├── docker-compose.yml    # Orquestração multi-serviço
+│       └── index.html      # Interface web (SPA)
+├── data/                   # Banco de dados SQLite
+├── downloads/              # Arquivos baixados (temporário)
+├── pyproject.toml          # Dependências (PEP 621)
+├── Dockerfile              # Build de produção
+├── docker-compose.yml      # Orquestração
 └── README.md
 ```
 
-## ⚙️ Configuração
+---
 
-| Variável de Ambiente | Descrição           | Padrão                  |
-| -------------------- | ------------------- | ----------------------- |
-| `PORT`               | Porta do servidor   | `8000`                  |
-| `POT_PROVIDER_URL`   | URL do servidor POT | `http://localhost:4416` |
+## API Reference
 
-## 🔧 Solução de Problemas
+### Endpoints REST
 
-| Problema           | Solução                                                |
-| ------------------ | ------------------------------------------------------ |
-| Erro 403 Forbidden | Verifique se o POT Provider está rodando (`docker ps`) |
-| Áudio não funciona | O FFmpeg deve estar instalado e no PATH                |
-| Download lento     | Verifique sua conexão de internet                      |
+| Método   | Endpoint                 | Descrição                           |
+| -------- | ------------------------ | ----------------------------------- |
+| `GET`    | `/`                      | Interface web                       |
+| `GET`    | `/api/preview?url=`      | Obtém informações do vídeo/playlist |
+| `POST`   | `/api/download`          | Inicia novo download                |
+| `GET`    | `/api/download/{job_id}` | Status de um download               |
+| `DELETE` | `/api/download/{job_id}` | Cancela download                    |
+| `GET`    | `/api/queue`             | Estado da fila                      |
+| `GET`    | `/api/history`           | Histórico de downloads              |
+| `DELETE` | `/api/history/{job_id}`  | Remove do histórico                 |
+| `DELETE` | `/api/history`           | Limpa histórico                     |
+| `GET`    | `/api/files/{filename}`  | Download de arquivo                 |
+| `GET`    | `/api/info`              | Informações da aplicação            |
 
-## 📜 Licença
+### Eventos Socket.IO
 
-Este projeto está licenciado sob a [Licença MIT](LICENSE).
-
-## ⚠️ Aviso Legal
-
-Esta ferramenta é fornecida apenas para fins educacionais. O usuário é responsável por garantir que o uso desta ferramenta esteja em conformidade com os Termos de Serviço do YouTube e as leis de direitos autorais aplicáveis.
+| Evento              | Direção         | Descrição                  |
+| ------------------- | --------------- | -------------------------- |
+| `start_download`    | Client → Server | Inicia download            |
+| `download_queued`   | Server → Client | Download adicionado à fila |
+| `download_progress` | Server → Client | Progresso do download      |
+| `download_complete` | Server → Client | Download concluído         |
+| `download_error`    | Server → Client | Erro no download           |
+| `queue_update`      | Server → Client | Atualização da fila        |
 
 ---
 
-Desenvolvido com ❤️ usando Python e FastAPI
+## Configuração
+
+| Variável           | Descrição           | Padrão                  |
+| ------------------ | ------------------- | ----------------------- |
+| `PORT`             | Porta do servidor   | `8000`                  |
+| `POT_PROVIDER_URL` | URL do POT Provider | `http://localhost:4416` |
+
+---
+
+## Troubleshooting
+
+| Problema               | Causa Provável         | Solução                                    |
+| ---------------------- | ---------------------- | ------------------------------------------ |
+| Erro 403 Forbidden     | POT Provider inativo   | Verificar `docker ps` ou iniciar container |
+| Áudio não reproduz     | Codec incompatível     | FFmpeg converte para AAC automaticamente   |
+| Download não inicia    | URL inválida           | Verificar se a plataforma é suportada      |
+| Progresso não atualiza | WebSocket desconectado | Verificar conexão no footer da interface   |
+
+---
+
+## Licença
+
+Distribuído sob a licença MIT. Veja [LICENSE](LICENSE) para mais informações.
+
+---
+
+## Aviso Legal
+
+Esta ferramenta destina-se exclusivamente a fins educacionais e pessoais. O usuário é integralmente responsável por garantir que a utilização esteja em conformidade com os termos de serviço das plataformas e a legislação de direitos autorais vigente.
+
+---
+
+<div align="center">
+
+**Desenvolvido com FastAPI e yt-dlp**
+
+[![Python](https://img.shields.io/badge/Made_with-Python-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/Powered_by-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+
+</div>
