@@ -28,6 +28,12 @@
 
 ---
 
+<div align="center">
+
+![Interface](docs/images/image.png)
+
+</div>
+
 ## Visão Geral
 
 Aplicação web de código aberto para download de vídeos de diversas plataformas. Interface moderna com suporte a múltiplos formatos, qualidades e playlists.
