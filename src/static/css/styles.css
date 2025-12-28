@@ -1,0 +1,145 @@
+/* ============================================================
+ * Baixar Vídeo - Main Stylesheet
+ * ============================================================ */
+
+* {
+  font-family: "Inter", sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  min-height: 100vh;
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #ff6b6b, #feca57, #ff9ff3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Platform colors */
+.platform-youtube {
+  --color: #ff0000;
+}
+.platform-instagram {
+  --color: #e1306c;
+}
+.platform-tiktok {
+  --color: #00f2ea;
+}
+.platform-twitter {
+  --color: #1da1f2;
+}
+.platform-facebook {
+  --color: #4267b2;
+}
+.platform-vimeo {
+  --color: #1ab7ea;
+}
+.platform-twitch {
+  --color: #9146ff;
+}
+.platform-reddit {
+  --color: #ff4500;
+}
+.platform-unknown {
+  --color: #888888;
+}
+
+/* Progress bar */
+.progress-bar {
+  transition: width 0.3s ease-out;
+  background: linear-gradient(90deg, #ff6b6b, #feca57);
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.4);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Tab styles */
+.tab-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Quality select */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23888'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  background-color: #1a1a1a;
+}
+
+select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 12px;
+}
+
+select option:hover,
+select option:focus,
+select option:checked {
+  background-color: #2a2a2a;
+  color: #ffffff;
+}
+
+select option:disabled {
+  color: #666666;
+}
+
+/* Platform icons */
+.platform-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}

@@ -1,0 +1,718 @@
+// ============================================================
+// Baixar Vídeo - Main Application Script
+// ============================================================
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  socket: null,
+  sid: null,
+  connected: false,
+  currentUrl: "",
+  previewData: null,
+  format: "video",
+  selectedPlaylistItems: [],
+  activeDownloads: {},
+  history: [],
+};
+
+const platformIcons = {
+  youtube: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#FF0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  instagram: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#E4405F"><path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/></svg>`,
+  tiktok: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#ffffff"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+  twitter: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#ffffff"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+  facebook: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`,
+  vimeo: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#1AB7EA"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609-3.268 4.247-6.026 6.37-8.29 6.37-1.409 0-2.578-1.294-3.553-3.881L5.322 11.4C4.603 8.816 3.834 7.522 3.01 7.522c-.179 0-.806.378-1.881 1.132L0 7.197c1.185-1.044 2.351-2.084 3.501-3.128C5.08 2.701 6.266 1.984 7.055 1.91c1.867-.18 3.016 1.1 3.447 3.838.465 2.953.789 4.789.971 5.507.539 2.45 1.131 3.674 1.776 3.674.502 0 1.256-.796 2.265-2.385 1.004-1.589 1.54-2.797 1.612-3.628.144-1.371-.395-2.061-1.614-2.061-.574 0-1.167.121-1.777.391 1.186-3.868 3.434-5.757 6.762-5.637 2.473.06 3.628 1.664 3.493 4.797l-.013.01z"/></svg>`,
+  twitch: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#9146FF"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>`,
+  reddit: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#FF4500"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.701zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/></svg>`,
+  unknown: `<svg class="platform-icon" viewBox="0 0 24 24" fill="#888888"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`,
+};
+
+const platformNames = {
+  youtube: "YouTube",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  twitter: "X (Twitter)",
+  facebook: "Facebook",
+  vimeo: "Vimeo",
+  twitch: "Twitch",
+  reddit: "Reddit",
+  unknown: "Outro",
+};
+
+// ============================================================
+// DOM ELEMENTS
+// ============================================================
+const ui = {
+  urlInput: document.getElementById("urlInput"),
+  platformBadge: document.getElementById("platformBadge"),
+  platformIcon: document.getElementById("platformIcon"),
+  previewBtn: document.getElementById("previewBtn"),
+  previewSection: document.getElementById("previewSection"),
+  previewLoading: document.getElementById("previewLoading"),
+  previewContent: document.getElementById("previewContent"),
+  previewThumb: document.getElementById("previewThumb"),
+  previewTitle: document.getElementById("previewTitle"),
+  previewPlatform: document.getElementById("previewPlatform"),
+  previewPlatformIcon: document.getElementById("previewPlatformIcon"),
+  previewPlatformName: document.getElementById("previewPlatformName"),
+  previewUploader: document.getElementById("previewUploader"),
+  previewDuration: document.getElementById("previewDuration"),
+  previewViews: document.getElementById("previewViews"),
+  playlistSection: document.getElementById("playlistSection"),
+  playlistTitle: document.getElementById("playlistTitle"),
+  playlistCount: document.getElementById("playlistCount"),
+  playlistItems: document.getElementById("playlistItems"),
+  formatVideo: document.getElementById("formatVideo"),
+  formatAudio: document.getElementById("formatAudio"),
+  videoQualitySection: document.getElementById("videoQualitySection"),
+  audioQualitySection: document.getElementById("audioQualitySection"),
+  videoQuality: document.getElementById("videoQuality"),
+  audioQuality: document.getElementById("audioQuality"),
+  downloadBtn: document.getElementById("downloadBtn"),
+  queueSection: document.getElementById("queueSection"),
+  queueCount: document.getElementById("queueCount"),
+  queueItems: document.getElementById("queueItems"),
+  historySection: document.getElementById("historySection"),
+  historyItems: document.getElementById("historyItems"),
+  connectionStatus: document.getElementById("connectionStatus"),
+};
+
+// ============================================================
+// SOCKET.IO
+// ============================================================
+function initSocket() {
+  state.socket = io({ transports: ["websocket"] });
+
+  state.socket.on("connect", () => {
+    state.connected = true;
+    updateConnectionStatus(true);
+    console.log("Socket conectado");
+  });
+
+  state.socket.on("disconnect", () => {
+    state.connected = false;
+    updateConnectionStatus(false);
+    console.log("Socket desconectado");
+  });
+
+  state.socket.on("session_id", (data) => {
+    state.sid = data.sid;
+  });
+
+  state.socket.on("download_queued", (data) => {
+    console.log("Download na fila:", data);
+    addToQueue(data.job_id, {
+      status: "queued",
+      position: data.position,
+    });
+  });
+
+  state.socket.on("download_status", (data) => {
+    updateQueueItem(data.job_id, {
+      status: data.status,
+      message: data.message,
+    });
+  });
+
+  state.socket.on("download_progress", (data) => {
+    updateQueueItem(data.job_id, {
+      status: "downloading",
+      progress: data.percentage,
+      speed: data.speed,
+      eta: data.eta,
+    });
+  });
+
+  state.socket.on("download_complete", (data) => {
+    completeDownload(data);
+  });
+
+  state.socket.on("download_error", (data) => {
+    failDownload(data.job_id, data.error);
+  });
+
+  state.socket.on("queue_update", (data) => {
+    updateQueueDisplay(data);
+  });
+}
+
+function updateConnectionStatus(connected) {
+  const dot = ui.connectionStatus.querySelector("span:first-child");
+  const text = ui.connectionStatus.querySelector("span:last-child");
+
+  if (connected) {
+    dot.className = "w-2 h-2 rounded-full bg-green-500";
+    text.textContent = "Conectado";
+  } else {
+    dot.className = "w-2 h-2 rounded-full bg-red-500";
+    text.textContent = "Desconectado";
+  }
+}
+
+// ============================================================
+// URL INPUT
+// ============================================================
+ui.urlInput.addEventListener("input", () => {
+  const url = ui.urlInput.value.trim();
+  if (url) {
+    const platform = detectPlatform(url);
+    ui.platformBadge.classList.remove("hidden");
+    ui.platformIcon.innerHTML = platformIcons[platform];
+  } else {
+    ui.platformBadge.classList.add("hidden");
+  }
+});
+
+ui.urlInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    getPreview();
+  }
+});
+
+function detectPlatform(url) {
+  url = url.toLowerCase();
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+  if (url.includes("instagram.com")) return "instagram";
+  if (url.includes("tiktok.com")) return "tiktok";
+  if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
+  if (url.includes("facebook.com") || url.includes("fb.watch"))
+    return "facebook";
+  if (url.includes("vimeo.com")) return "vimeo";
+  if (url.includes("twitch.tv")) return "twitch";
+  if (url.includes("reddit.com")) return "reddit";
+  return "unknown";
+}
+
+// ============================================================
+// PREVIEW
+// ============================================================
+async function getPreview() {
+  const url = ui.urlInput.value.trim();
+  if (!url) {
+    ui.urlInput.classList.add("border-red-500");
+    setTimeout(() => ui.urlInput.classList.remove("border-red-500"), 1000);
+    return;
+  }
+
+  state.currentUrl = url;
+
+  // Show loading
+  ui.previewSection.classList.remove("hidden");
+  ui.previewLoading.classList.remove("hidden");
+  ui.previewContent.classList.add("hidden");
+  ui.previewBtn.disabled = true;
+  ui.previewBtn.innerHTML = `
+    <div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+    <span>Buscando...</span>
+  `;
+
+  try {
+    const response = await fetch(`/api/preview?url=${encodeURIComponent(url)}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Erro ao obter preview");
+    }
+
+    const data = await response.json();
+    state.previewData = data;
+    displayPreview(data);
+  } catch (error) {
+    console.error("Erro no preview:", error);
+    alert("Erro: " + error.message);
+    ui.previewSection.classList.add("hidden");
+  } finally {
+    ui.previewBtn.disabled = false;
+    ui.previewBtn.innerHTML = `
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <span>Buscar</span>
+    `;
+  }
+}
+
+function displayPreview(data) {
+  ui.previewLoading.classList.add("hidden");
+  ui.previewContent.classList.remove("hidden");
+
+  const video = data.videos[0];
+  const platform = data.platform;
+
+  // Platform badge
+  ui.previewPlatformIcon.innerHTML = platformIcons[platform];
+  ui.previewPlatformName.textContent = platformNames[platform];
+
+  // Video info
+  ui.previewThumb.src =
+    video.thumbnail || "https://placehold.co/320x180/1a1a1a/333?text=";
+  ui.previewTitle.textContent = video.title;
+
+  // Uploader
+  if (video.uploader) {
+    ui.previewUploader.classList.remove("hidden");
+    ui.previewUploader.querySelector("span:last-child").textContent =
+      video.uploader;
+  } else {
+    ui.previewUploader.classList.add("hidden");
+  }
+
+  // Duration
+  if (video.duration) {
+    ui.previewDuration.classList.remove("hidden");
+    ui.previewDuration.querySelector("span:last-child").textContent =
+      formatDuration(video.duration);
+  } else {
+    ui.previewDuration.classList.add("hidden");
+  }
+
+  // Views
+  if (video.view_count) {
+    ui.previewViews.classList.remove("hidden");
+    ui.previewViews.querySelector("span:last-child").textContent =
+      formatNumber(video.view_count) + " views";
+  } else {
+    ui.previewViews.classList.add("hidden");
+  }
+
+  // Playlist
+  if (data.is_playlist) {
+    ui.playlistSection.classList.remove("hidden");
+    ui.playlistTitle.textContent = data.playlist_title || "Playlist";
+    ui.playlistCount.textContent = `(${data.playlist_count} vídeos)`;
+
+    state.selectedPlaylistItems = data.videos.map((_, i) => i + 1);
+    displayPlaylistItems(data.videos);
+  } else {
+    ui.playlistSection.classList.add("hidden");
+    state.selectedPlaylistItems = [];
+  }
+
+  // Update quality options based on available qualities
+  updateQualityOptions(data.available_qualities);
+}
+
+function displayPlaylistItems(videos) {
+  ui.playlistItems.innerHTML = videos
+    .map(
+      (video, index) => `
+    <label class="flex items-center gap-3 p-3 glass-subtle rounded-lg cursor-pointer hover:bg-white/5 transition-colors">
+      <input 
+        type="checkbox" 
+        checked
+        onchange="togglePlaylistItem(${index + 1})"
+        class="w-4 h-4 rounded border-white/20 bg-white/5 text-red-500 focus:ring-red-500/50"
+      />
+      <img 
+        src="${video.thumbnail || ""}" 
+        alt="" 
+        class="w-16 h-9 object-cover rounded bg-white/5"
+      />
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium truncate">${video.title}</p>
+        <p class="text-xs text-gray-500">${
+          video.duration ? formatDuration(video.duration) : ""
+        }</p>
+      </div>
+    </label>
+  `
+    )
+    .join("");
+}
+
+function togglePlaylistItem(index) {
+  const idx = state.selectedPlaylistItems.indexOf(index);
+  if (idx > -1) {
+    state.selectedPlaylistItems.splice(idx, 1);
+  } else {
+    state.selectedPlaylistItems.push(index);
+    state.selectedPlaylistItems.sort((a, b) => a - b);
+  }
+}
+
+function selectAllPlaylist() {
+  state.selectedPlaylistItems = state.previewData.videos.map((_, i) => i + 1);
+  ui.playlistItems.querySelectorAll("input").forEach((cb) => {
+    cb.checked = true;
+  });
+}
+
+function deselectAllPlaylist() {
+  state.selectedPlaylistItems = [];
+  ui.playlistItems.querySelectorAll("input").forEach((cb) => {
+    cb.checked = false;
+  });
+}
+
+function updateQualityOptions(qualities) {
+  // Update video quality dropdown based on available qualities
+  if (qualities && qualities.length > 0) {
+    const options = ui.videoQuality.querySelectorAll("option");
+    options.forEach((opt) => {
+      if (opt.value !== "best") {
+        const available = qualities.includes(opt.value);
+        opt.disabled = !available;
+        if (!available) {
+          opt.textContent = opt.textContent.replace(" (Indisponível)", "");
+          opt.textContent += " (Indisponível)";
+        }
+      }
+    });
+  }
+}
+
+// ============================================================
+// FORMAT SELECTION
+// ============================================================
+function setFormat(format) {
+  state.format = format;
+
+  // Update buttons
+  document.querySelectorAll(".format-btn").forEach((btn) => {
+    btn.classList.remove("active", "bg-red-500/20", "border-red-500/50");
+  });
+
+  if (format === "video") {
+    ui.formatVideo.classList.add(
+      "active",
+      "bg-red-500/20",
+      "border-red-500/50"
+    );
+    ui.videoQualitySection.style.opacity = "1";
+    ui.videoQualitySection.style.pointerEvents = "auto";
+  } else {
+    ui.formatAudio.classList.add(
+      "active",
+      "bg-red-500/20",
+      "border-red-500/50"
+    );
+    ui.videoQualitySection.style.opacity = "0.5";
+    ui.videoQualitySection.style.pointerEvents = "none";
+  }
+}
+
+// ============================================================
+// DOWNLOAD
+// ============================================================
+function startDownload() {
+  if (!state.currentUrl || !state.previewData) {
+    return;
+  }
+
+  const data = {
+    url: state.currentUrl,
+    format: state.format,
+    video_quality: ui.videoQuality.value,
+    audio_quality: ui.audioQuality.value,
+  };
+
+  if (state.previewData.is_playlist && state.selectedPlaylistItems.length > 0) {
+    data.playlist_items = state.selectedPlaylistItems;
+  }
+
+  // Send via socket
+  state.socket.emit("start_download", data);
+
+  // Add placeholder to queue
+  const tempId = "pending-" + Date.now();
+  addToQueue(tempId, {
+    title: state.previewData.videos[0]?.title || "Preparando...",
+    platform: state.previewData.platform,
+    status: "queued",
+    progress: 0,
+  });
+
+  // Reset preview
+  ui.previewSection.classList.add("hidden");
+  ui.urlInput.value = "";
+  state.currentUrl = "";
+  state.previewData = null;
+}
+
+// ============================================================
+// QUEUE MANAGEMENT
+// ============================================================
+function addToQueue(jobId, data) {
+  state.activeDownloads[jobId] = {
+    ...data,
+    job_id: jobId,
+  };
+  renderQueue();
+}
+
+function updateQueueItem(jobId, data) {
+  if (state.activeDownloads[jobId]) {
+    state.activeDownloads[jobId] = {
+      ...state.activeDownloads[jobId],
+      ...data,
+    };
+    renderQueue();
+  }
+}
+
+function completeDownload(data) {
+  delete state.activeDownloads[data.job_id];
+  renderQueue();
+
+  // Add to history
+  loadHistory();
+
+  // Auto-download file
+  if (data.is_playlist) {
+    // Multiple files
+    data.files.forEach((file) => {
+      downloadFile(file.url, file.filename);
+    });
+  } else {
+    downloadFile(data.url, data.filename);
+  }
+}
+
+function downloadFile(url, filename) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function failDownload(jobId, error) {
+  if (state.activeDownloads[jobId]) {
+    state.activeDownloads[jobId].status = "failed";
+    state.activeDownloads[jobId].error = error;
+    renderQueue();
+
+    setTimeout(() => {
+      delete state.activeDownloads[jobId];
+      renderQueue();
+    }, 5000);
+  }
+  alert("Erro no download: " + error);
+}
+
+function renderQueue() {
+  const items = Object.values(state.activeDownloads);
+
+  if (items.length === 0) {
+    ui.queueSection.classList.add("hidden");
+    return;
+  }
+
+  ui.queueSection.classList.remove("hidden");
+  ui.queueCount.textContent = `${items.length} item(s)`;
+
+  ui.queueItems.innerHTML = items
+    .map((item) => {
+      const statusColors = {
+        queued: "bg-yellow-500",
+        fetching_info: "bg-blue-500",
+        downloading: "bg-green-500",
+        processing: "bg-purple-500",
+        completed: "bg-green-500",
+        failed: "bg-red-500",
+      };
+
+      const statusLabels = {
+        queued: "Na fila",
+        fetching_info: "Obtendo info...",
+        downloading: "Baixando",
+        processing: "Processando",
+        completed: "Concluído",
+        failed: "Erro",
+      };
+
+      return `
+        <div class="glass-subtle rounded-xl p-4 animate-fade-in">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 flex-shrink-0">${
+                platformIcons[item.platform] || platformIcons.unknown
+              }</span>
+              <div>
+                <p class="font-medium truncate max-w-xs">${
+                  item.title || "Processando..."
+                }</p>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span class="w-2 h-2 rounded-full ${
+                    statusColors[item.status] || "bg-gray-500"
+                  }"></span>
+                  <span>${statusLabels[item.status] || item.status}</span>
+                  ${item.speed ? `<span>• ${item.speed}</span>` : ""}
+                  ${item.eta ? `<span>• ETA: ${item.eta}</span>` : ""}
+                </div>
+              </div>
+            </div>
+            <span class="text-2xl font-bold ${
+              item.progress >= 100 ? "text-green-500" : "text-white"
+            }">
+              ${Math.round(item.progress || 0)}%
+            </span>
+          </div>
+          <div class="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+            <div 
+              class="h-full progress-bar" 
+              style="width: ${item.progress || 0}%"
+            ></div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function updateQueueDisplay(data) {
+  // Full queue update from server
+  data.items.forEach((item) => {
+    state.activeDownloads[item.job_id] = item;
+  });
+  renderQueue();
+}
+
+// ============================================================
+// HISTORY
+// ============================================================
+async function loadHistory() {
+  try {
+    const response = await fetch("/api/history?per_page=10");
+    const data = await response.json();
+    state.history = data.items;
+    renderHistory();
+  } catch (error) {
+    console.error("Erro ao carregar histórico:", error);
+  }
+}
+
+function renderHistory() {
+  if (state.history.length === 0) {
+    ui.historyItems.innerHTML = `
+      <div class="text-center py-8 text-gray-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+        </svg>
+        <p class="text-sm">Nenhum download realizado ainda</p>
+      </div>
+    `;
+    return;
+  }
+
+  ui.historyItems.innerHTML = state.history
+    .map((item) => {
+      const date = new Date(item.created_at);
+      const formattedDate = date.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const statusColors = {
+        completed: "text-green-500",
+        failed: "text-red-500",
+        downloading: "text-yellow-500",
+      };
+
+      return `
+        <div class="glass-subtle rounded-xl p-4 flex items-center gap-4">
+          ${
+            item.thumbnail
+              ? `<img src="${item.thumbnail}" alt="" class="w-20 h-12 object-cover rounded-lg bg-white/5">`
+              : ""
+          }
+          <div class="flex-1 min-w-0">
+            <p class="font-medium truncate">${item.title || "Sem título"}</p>
+            <div class="flex items-center gap-3 text-xs text-gray-500">
+              <span class="flex items-center gap-1"><span class="w-4 h-4">${
+                platformIcons[item.platform] || platformIcons.unknown
+              }</span> ${platformNames[item.platform] || "Outro"}</span>
+              <span>•</span>
+              <span class="${statusColors[item.status] || ""}">${
+        item.status === "completed" ? "Concluído" : item.status
+      }</span>
+              <span>•</span>
+              <span>${formattedDate}</span>
+              ${
+                item.file_size
+                  ? `<span>• ${formatBytes(item.file_size)}</span>`
+                  : ""
+              }
+            </div>
+          </div>
+          ${
+            item.status === "completed" && item.file_path
+              ? `
+            <a 
+              href="/api/files/${item.file_path.split(/[\\/]/).pop()}"
+              download
+              class="px-4 py-2 rounded-lg glass hover:bg-white/10 transition-colors text-sm"
+            >
+              Baixar
+            </a>
+          `
+              : ""
+          }
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function clearHistory() {
+  if (!confirm("Tem certeza que deseja limpar todo o histórico?")) {
+    return;
+  }
+
+  try {
+    await fetch("/api/history", { method: "DELETE" });
+    state.history = [];
+    renderHistory();
+  } catch (error) {
+    console.error("Erro ao limpar histórico:", error);
+  }
+}
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function formatDuration(seconds) {
+  if (!seconds) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${s
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatNumber(num) {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + "M";
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + "K";
+  }
+  return num.toString();
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  initSocket();
+  loadHistory();
+  setFormat("video"); // Default format
+});

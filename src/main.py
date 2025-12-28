@@ -95,6 +95,9 @@ socket_app = socketio.ASGIApp(sio, app)
 # Templates
 templates = Jinja2Templates(directory=str(settings.BASE_DIR / "src" / "templates"))
 
+# Static files (CSS, JS)
+app.mount("/static", StaticFiles(directory=str(settings.BASE_DIR / "src" / "static")), name="static")
+
 
 # ============================================================
 # BACKGROUND TASKS
